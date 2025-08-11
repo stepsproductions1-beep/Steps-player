@@ -1,5 +1,5 @@
 
-# Steps Player 
+# Multi-Cam Vimeo Player — Ready to Deploy (Latest)
 
 ملفّان أساسيان:
 - `index.html` — صفحة المشاهدة (Player). تقرأ الإعدادات من LocalStorage.
@@ -13,4 +13,3 @@
 1) افتح `admin.html` أول مرة لتعيين كلمة مرور.
 2) عدّل الإعدادات واحفظ.
 3) افتح/حدّث `index.html` لمشاهدة التغييرات.
-
