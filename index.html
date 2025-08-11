@@ -3,87 +3,165 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Multi‑Cam Vimeo — Player (قراءة إعدادات فقط)</title>
+  <title>Multi‑Cam Player — Secure (JWT Gate + Encrypted Config)</title>
   <style>
-    :root{--bg:#0b0f14;--card:#121821;--muted:#2a3442;--brand:#ff3b30;--text:#e7eef7;--text-dim:#a8b3c2}
+    :root{--bg:#0b0f14;--muted:#2a3442;--brand:#ff3b30;--text:#e7eef7;--text-dim:#a8b3c2}
     *{box-sizing:border-box}
     html,body{height:100%}
     body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
     .wrap{width:100vw;height:100svh;margin:0}
-    .player-card{width:100%;height:100%;background:transparent;border-radius:0;overflow:hidden}
     .video-area{position:relative;width:100%;height:100%;background:#000;overflow:hidden}
-
-    /* الخلفية: الكاميرات المتبدّلة (Deck) */
     .iframeDeck{position:absolute;inset:0;overflow:hidden}
     .iframeDeck iframe{position:absolute;inset:0;width:100%;height:100%;border:0;opacity:0;visibility:hidden;transition:opacity .18s ease}
     .iframeDeck iframe.active{opacity:1;visibility:visible;z-index:1}
     .iframeDeck iframe.fading{opacity:0;visibility:visible;z-index:0;pointer-events:none}
-
-    /* PiP (Main) — في الوضع العادي أعلى يمين، في وضع التقسيم يغطي النصف الأيمن */
-    .pip{position:absolute;right:16px;top:16px;width:min(28%,420px);aspect-ratio:16/9;border:0;border-radius:0;overflow:hidden;box-shadow:none;background:transparent;z-index:2}
+    .pip{position:absolute;right:16px;top:16px;width:min(28%,420px);aspect-ratio:16/9;border:0;border-radius:0;overflow:hidden;background:transparent;z-index:2}
     .pip iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
     .pip.hidden{display:none}
-
-    /* وضع التقسيم */
-    .video-area.split .pip{right:0;top:0;left:auto;bottom:0;width:50%;height:100%;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none;z-index:1}
+    .video-area.split .pip{right:0;top:0;left:auto;bottom:0;width:50%;height:100%;aspect-ratio:auto;z-index:1}
     .video-area.split #iframeDeck{left:0;right:50%;top:0;bottom:0;width:auto}
-
-    /* عناصر التحكّم السفلية (للوضع العادي) */
     .controls{position:absolute;left:16px;right:16px;bottom:16px;display:flex;gap:8px;flex-wrap:wrap;z-index:3}
-    .btn{border:1px solid var(--muted);background:#18202b;color:#e7eef7;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600;transition:.2s}
-    .btn:hover{border-color:#3a495f;transform:translateY(-1px)}
+    .btn{border:1px solid var(--muted);background:#18202b;color:#e7eef7;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
     .btn.active{background:var(--brand);border-color:transparent;color:#fff;box-shadow:0 6px 12px rgba(255,59,48,.35)}
-
-    /* قائمة جانبية للأسماء في وضع التقسيم */
     .sideList{position:absolute;top:50%;left:16px;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:4}
-    .sideList .btn{min-width:140px;text-align:center}
     .video-area.split .sideList{display:flex}
     .video-area.split .controls{display:none}
-
-    /* أزرار أعلى اليسار: الصوت + وضع التقسيم */
     .topLeft{position:absolute;left:16px;top:16px;z-index:4;display:flex;gap:8px;flex-wrap:wrap}
     .audioBtn, .splitBtn{border:1px solid var(--muted);background:#1b2531;color:#e7eef7;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:700}
     .audioBtn[aria-pressed="true"], .splitBtn[aria-pressed="true"]{background:var(--brand);color:#fff;border-color:transparent}
-
-    /* معلومات */
     .meta{position:absolute;left:16px;top:60px;z-index:3;color:#a8b3c2;font-size:14px;background:rgba(0,0,0,.35);padding:6px 10px;border-radius:8px;backdrop-filter:blur(3px)}
-    .badge{padding:2px 6px;border:1px solid var(--muted);border-radius:999px;margin-right:8px;color:#e7eef7}
-
     .tests{position:absolute;left:16px;top:100px;z-index:3;color:#a8b3c2;font-size:12px;background:rgba(0,0,0,.25);padding:6px 10px;border-radius:8px}
+    .gate{position:fixed;inset:0;background:linear-gradient(180deg,rgba(11,15,20,.96),rgba(11,15,20,.96));display:flex;align-items:center;justify-content:center;z-index:50}
+    .card{width:min(560px,96vw);background:#0f1620;border:1px solid #1f2937;border-radius:14px;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+    .card .hd{padding:14px 16px;border-bottom:1px solid #1f2937;font-weight:800}
+    .card .bd{padding:16px}
+    .row{display:grid;grid-template-columns:1fr;gap:10px}
+    label{display:block;margin-bottom:6px;color:#b6c2d2;font-size:13px}
+    input[type="text"],input[type="password"]{width:100%;padding:10px;border-radius:10px;border:1px solid #2a3442;background:#121a24;color:#e7eef7}
+    .note{font-size:12px;color:#9fb0c5}
+    .err{color:#ff7373;font-size:13px;margin-top:6px}
   </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="player-card">
-    <div class="video-area" id="videoArea">
-      <!-- Deck (يشمل Main كعنصر 0) -->
-      <div id="iframeDeck" class="iframeDeck" aria-live="polite"></div>
-
-      <!-- PiP ثابت: MAIN (يصبح نصف الشاشة الأيمن في وضع التقسيم) -->
-      <div class="pip" title="Main (الصوت الرئيسي)">
-        <iframe id="mainIframe" src="about:blank" allow="autoplay; fullscreen; picture-in-picture; encrypted-media; web-share" allowfullscreen></iframe>
+<div id="gate" class="gate" aria-modal="true" role="dialog">
+  <div class="card">
+    <div class="hd">التحقق من الدخول</div>
+    <div class="bd">
+      <div class="row">
+        <div>
+          <label>رمز الدخول (JWT)</label>
+          <input id="jwtInput" type="text" placeholder="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." autocomplete="one-time-code">
+          <div class="note">أرسل الرابط للمشاهدين مع ?t=TOKEN أو الصق الرمز هنا. يتم التحقق بالتوقيع العام (RS256).</div>
+        </div>
+        <div>
+          <label>كلمة فك تشفير الإعدادات (اختياري)</label>
+          <input id="cfgPass" type="password" placeholder="كلمة المرور إن كانت الإعدادات مشفرة">
+          <div class="note">إذا لم يوجد ملف <code>config.public.json</code> سيُطلب فك تشفير الإعدادات من LocalStorage.</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="btnEnter" class="btn">دخول</button>
+          <a class="btn" href="admin.html" target="_blank" rel="noopener">فتح لوحة التحكّم</a>
+        </div>
+        <div id="gateErr" class="err" role="alert" style="display:none"></div>
+        <div class="note">ملاحظة: هذه حماية قوية على مستوى الواجهة، يُنصح بربط الدومين مع Cloudflare Access لمستوى مؤسسي.</div>
       </div>
-
-      <!-- أزرار أعلى اليسار -->
-      <div class="topLeft">
-        <button id="audioBtn" class="audioBtn" type="button" aria-pressed="false" aria-label="تشغيل/إيقاف صوت Main">🔇 الصوت: متوقف</button>
-        <button id="splitBtn" class="splitBtn" type="button" aria-pressed="false" aria-label="تبديل وضع تقسيم الشاشة">🞄🞄 تقسيم الشاشة</button>
-      </div>
-
-      <!-- Controls (أسفل) + قائمة جانبية للأسماء -->
-      <div class="controls" id="camButtons" role="group" aria-label="التبديل بين الكاميرات"></div>
-      <div class="sideList" id="sideList" role="group" aria-label="قائمة الكاميرات"></div>
-
-      <div class="meta"><span class="badge" id="status">جاهز</span> الصوت من: <strong>Main</strong> — في وضع التقسيم: يمين = Main، يسار = الكاميرات المتبدلة</div>
-      <div class="tests" id="tests"></div>
     </div>
+  </div>
+</div>
+
+<div class="wrap" id="app" style="display:none">
+  <div class="video-area" id="videoArea">
+    <div id="iframeDeck" class="iframeDeck" aria-live="polite"></div>
+    <div class="pip" title="Main (الصوت الرئيسي)">
+      <iframe id="mainIframe" src="about:blank" allow="autoplay; fullscreen; picture-in-picture; encrypted-media; web-share" allowfullscreen></iframe>
+    </div>
+    <div class="topLeft">
+      <button id="audioBtn" class="audioBtn" type="button" aria-pressed="false">🔇 الصوت: متوقف</button>
+      <button id="splitBtn" class="splitBtn" type="button" aria-pressed="false">🞄🞄 تقسيم الشاشة</button>
+    </div>
+    <div class="controls" id="camButtons"></div>
+    <div class="sideList" id="sideList"></div>
+    <div class="meta"><span class="badge" id="status">جاهز</span> | Secure Mode</div>
+    <div class="tests" id="tests"></div>
   </div>
 </div>
 
 <script src="https://player.vimeo.com/api/player.js"></script>
 <script>
-(function(){
-  // ======== CONFIG (قراءة فقط) ========
+(async function(){
+  const EXPECTED_AUD = "multicam-viewer";
+  const PUBLIC_KEY_URL = "publicKey.json";
+  const CONFIG_PUBLIC_URL = "config.public.json";
+
+  const gate = document.getElementById('gate');
+  const btnEnter = document.getElementById('btnEnter');
+  const jwtInput = document.getElementById('jwtInput');
+  const cfgPass  = document.getElementById('cfgPass');
+  const gateErr  = document.getElementById('gateErr');
+
+  const te = new TextEncoder();
+  const td = new TextDecoder();
+
+  function b64urlToBytes(b64url){
+    const pad = '='.repeat((4 - (b64url.length % 4)) % 4);
+    const b64 = (b64url.replace(/-/g,'+').replace(/_/g,'/')) + pad;
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+    return bytes;
+  }
+  async function importRSAPublicJwk(jwk){
+    return crypto.subtle.importKey(
+      'jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      true, ['verify']
+    );
+  }
+  async function verifyJWT_RS256(token, publicKey){
+    const parts = token.split('.'); if(parts.length!==3) throw new Error('صيغة JWT غير صحيحة');
+    const [p0,p1,p2] = parts;
+    const data = te.encode(p0 + '.' + p1);
+    const sig  = b64urlToBytes(p2);
+    const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', publicKey, sig, data);
+    if(!ok) throw new Error('فشل التحقق من التوقيع');
+    const payload = JSON.parse(td.decode(b64urlToBytes(p1)));
+    const now = Math.floor(Date.now()/1000);
+    if(payload.exp && now >= payload.exp) throw new Error('انتهت صلاحية الرمز');
+    if(payload.nbf && now < payload.nbf)  throw new Error('الرمز غير فعّال بعد');
+    if(payload.aud && payload.aud !== EXPECTED_AUD) throw new Error('aud غير مطابق');
+    return payload;
+  }
+
+  let publicKey;
+  try{
+    const res = await fetch(PUBLIC_KEY_URL, {cache:'no-store'});
+    if(!res.ok) throw new Error();
+    const jwk = await res.json();
+    publicKey = await importRSAPublicJwk(jwk);
+  }catch(e){
+    showErr('تعذّر تحميل المفتاح العام publicKey.json — ارفع الملف أو استعمل tools.html لإنشائه.');
+    return;
+  }
+
+  const params = new URLSearchParams(location.search);
+  const urlToken = params.get('t');
+  if(urlToken) jwtInput.value = urlToken;
+
+  btnEnter.addEventListener('click', async ()=>{
+    try{
+      gateErr.style.display='none';
+      if(!jwtInput.value.trim()) throw new Error('أدخل رمز JWT');
+      const payload = await verifyJWT_RS256(jwtInput.value.trim(), publicKey);
+      gate.style.display='none';
+      document.getElementById('app').style.display='block';
+      initPlayer(payload, cfgPass.value.trim());
+    }catch(err){
+      showErr(err.message||String(err));
+    }
+  });
+
+  function showErr(msg){ gateErr.textContent = msg; gateErr.style.display='block'; }
+
+  const LS_CFG_ENC = 'mc_cfg_enc_v2';
   const DEFAULT_CFG = {
     main: { name: 'Main', src: 'https://vimeo.com/event/5302696/embed/a4a7110029/interaction' },
     cams: [
@@ -93,188 +171,137 @@
       { name: 'كاميرا 5', src: 'https://player.vimeo.com/video/45678901' },
       { name: 'كاميرا 6', src: 'https://player.vimeo.com/video/56789012' }
     ],
-    brand: '#ff3b30',
-    splitPct: 50,
-    pipPct: 28,
-    defaultSplit: false
+    brand: '#ff3b30', splitPct: 50, pipPct: 28, defaultSplit: false
   };
-  const LS_KEY = 'mc_config_v1';
 
-  // ======== Elements ========
-  const videoArea = document.getElementById('videoArea');
-  const mainIframe = document.getElementById('mainIframe');
-  const pip = document.querySelector('.pip');
-  const deck = document.getElementById('iframeDeck');
-  const panel = document.getElementById('camButtons');
-  const sideList = document.getElementById('sideList');
-  const status = document.getElementById('status');
-  const testsEl = document.getElementById('tests');
-  const audioBtn = document.getElementById('audioBtn');
-  const splitBtn = document.getElementById('splitBtn');
-
-  // ======== State ========
-  let cfg = loadConfig();
-  let DECK = buildDeckArrayFromCfg(cfg);
-  let currentBg = 0; // index داخل DECK
-  let deckIframes = [];
-  let mainPlayer = null;
-  let audioArmed = false;
-  let audioMuted = true; // يبدأ مكتوم
-  let isSplit = !!cfg.defaultSplit;   // وضع التقسيم من الإعدادات
-
-  // ======== Utils ========
-  function loadConfig(){
+  async function loadConfig(passphrase){
     try{
-      const raw = localStorage.getItem(LS_KEY);
-      if (!raw) return JSON.parse(JSON.stringify(DEFAULT_CFG));
-      const parsed = JSON.parse(raw);
-      return { ...JSON.parse(JSON.stringify(DEFAULT_CFG)), ...parsed };
-    }catch(e){ return JSON.parse(JSON.stringify(DEFAULT_CFG)); }
+      const r = await fetch(CONFIG_PUBLIC_URL, {cache:'no-store'});
+      if(r.ok){ const j = await r.json(); return j; }
+    }catch(_){}
+    const raw = localStorage.getItem(LS_CFG_ENC);
+    if(!raw) return DEFAULT_CFG;
+    if(!passphrase) throw new Error('هذه الإعدادات مشفّرة — أدخل كلمة فك التشفير.');
+    const enc = JSON.parse(raw);
+    if(!enc || enc.v!==2) throw new Error('صيغة تشفير غير مدعومة');
+    const key = await deriveKey(passphrase, enc.salt, enc.iter);
+    const dec = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64urlToBytes(enc.iv)}, key, b64urlToBytes(enc.data));
+    const text = td.decode(new Uint8Array(dec));
+    return JSON.parse(text);
   }
-  function buildDeckArrayFromCfg(c){ return [c.main, ...c.cams]; }
-  const qJoin = (obj)=> Object.entries(obj).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
-  const withParams = (base, params)=> base + (base.includes('?')?'&':'?') + qJoin(params);
-  const logStatus = (t)=> status.textContent = t;
-  const setActiveButton = (i, container)=>{ [...container.children].forEach((b,idx)=> b.classList.toggle('active', idx===i)); };
-  const applyPiPVisibility = ()=>{
-    const hideWhenMain = !isSplit && currentBg === 0;
-    pip.classList.toggle('hidden', hideWhenMain);
-  };
-  const updateAudioUI = ()=>{
-    audioBtn.setAttribute('aria-pressed', String(!audioMuted));
-    audioBtn.textContent = audioMuted ? '🔇 الصوت: متوقف' : '🔊 الصوت: يعمل';
-    audioBtn.dataset.muted = String(audioMuted);
-  };
-  function ensureMainPlayer(){ if (!mainPlayer) mainPlayer = new Vimeo.Player(mainIframe); }
-  function ensureMainAudioOn(){ ensureMainPlayer(); mainPlayer.setMuted(false).then(()=>mainPlayer.play()).catch(()=>{}); audioMuted=false; updateAudioUI(); }
-  function ensureMainAudioOff(){ ensureMainPlayer(); mainPlayer.setMuted(true).catch(()=>{}); audioMuted=true; updateAudioUI(); }
+  async function deriveKey(passphrase, saltB64url, iter){
+    const baseKey = await crypto.subtle.importKey('raw', te.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      {name:'PBKDF2', salt:b64urlToBytes(saltB64url), iterations: Number(iter)||310000, hash:'SHA-256'},
+      baseKey,
+      {name:'AES-GCM', length:256},
+      false,
+      ['encrypt','decrypt']
+    );
+  }
 
-  // ======== Player Building ========
-  function switchBackground(i){
-    if (i === currentBg) return;
-    const cur = deckIframes[currentBg];
-    const nxt = deckIframes[i];
-    if (!nxt) return;
-    if (cur){
-      cur.classList.remove('active');
-      cur.classList.add('fading');
-      const cleanup = ()=>{ cur.classList.remove('fading'); cur.removeEventListener('transitionend', cleanup); };
-      cur.addEventListener('transitionend', cleanup, {once:true});
-      setTimeout(cleanup, 400);
+  async function initPlayer(jwtPayload, passphrase){
+    const cfg = await loadConfig(passphrase).catch(e=>{ showErr(e.message||String(e)); throw e; });
+    const videoArea = document.getElementById('videoArea');
+    const mainIframe = document.getElementById('mainIframe');
+    const pip = document.querySelector('.pip');
+    const deck = document.getElementById('iframeDeck');
+    const panel = document.getElementById('camButtons');
+    const sideList = document.getElementById('sideList');
+    const status = document.getElementById('status');
+    const testsEl = document.getElementById('tests');
+    const audioBtn = document.getElementById('audioBtn');
+    const splitBtn = document.getElementById('splitBtn');
+
+    let DECK = [cfg.main, ...cfg.cams];
+    let currentBg = 0, deckIframes=[], mainPlayer=null, audioArmed=false, audioMuted=true, isSplit=!!cfg.defaultSplit;
+
+    const qJoin = (obj)=> Object.entries(obj).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+    const withParams = (base, params)=> base + (base.includes('?')?'&':'?') + qJoin(params);
+    const logStatus = (t)=> status.textContent = t;
+    const setActiveButton = (i, container)=>{ [...container.children].forEach((b,idx)=> b.classList.toggle('active', idx===i)); };
+    const applyPiPVisibility = ()=>{ const hide = !isSplit && currentBg===0; pip.classList.toggle('hidden', hide); };
+    const updateAudioUI = ()=>{ audioBtn.setAttribute('aria-pressed', String(!audioMuted)); audioBtn.textContent = audioMuted ? '🔇 الصوت: متوقف' : '🔊 الصوت: يعمل'; };
+
+    function ensureMainPlayer(){ if (!mainPlayer) mainPlayer = new Vimeo.Player(mainIframe); }
+    function ensureMainAudioOn(){ ensureMainPlayer(); mainPlayer.setMuted(false).then(()=>mainPlayer.play()).catch(()=>{}); audioMuted=false; updateAudioUI(); }
+    function ensureMainAudioOff(){ ensureMainPlayer(); mainPlayer.setMuted(true).catch(()=>{}); audioMuted=true; updateAudioUI(); }
+
+    function switchBackground(i){
+      if (i === currentBg) return;
+      const cur = deckIframes[currentBg];
+      const nxt = deckIframes[i];
+      if (!nxt) return;
+      if (cur){
+        cur.classList.remove('active');
+        cur.classList.add('fading');
+        const cleanup = ()=>{ cur.classList.remove('fading'); cur.removeEventListener('transitionend', cleanup); };
+        cur.addEventListener('transitionend', cleanup, {once:true});
+        setTimeout(cleanup, 400);
+      }
+      nxt.classList.add('active');
+      currentBg = i;
+      applyPiPVisibility();
     }
-    nxt.classList.add('active');
-    currentBg = i;
-    applyPiPVisibility();
-  }
 
-  function buildMain(){
-    document.documentElement.style.setProperty('--brand', cfg.brand || '#ff3b30');
-    // حجم PiP في الوضع العادي
-    const pipPct = Math.min(40, Math.max(15, Number(cfg.pipPct||28)));
-    pip.style.width = `min(${pipPct}%, 420px)`;
-    // نسبة التقسيم
-    const pct = Math.min(70, Math.max(30, Number(cfg.splitPct||50)));
-    if (isSplit){
-      pip.style.width = pct + '%';
-      deck.style.right = pct + '%';
-      deck.style.left = '0%';
-    } else {
-      deck.style.left = '0';
-      deck.style.right = '0';
-    }
-
-    const url = withParams(cfg.main.src, { autoplay: 1, muted: 1, controls: 0, background: 1, playsinline: 1 });
-    mainIframe.src = url;
-    updateAudioUI();
-  }
-
-  function buildDeckIframes(){
-    // clean
-    deck.innerHTML = '';
-    deckIframes = DECK.map((cam, i)=>{
-      const url = withParams(cam.src, { autoplay: 1, muted: 1, controls: 0, background: 1, playsinline: 1 });
-      const f = document.createElement('iframe');
-      f.src = url;
-      f.setAttribute('allow','autoplay; fullscreen; picture-in-picture; encrypted-media; web-share');
-      f.setAttribute('allowfullscreen','');
-      f.setAttribute('loading','eager');
-      if (i===currentBg) f.classList.add('active');
-      deck.appendChild(f);
-      return f;
-    });
-  }
-
-  function buildButtons(container){
-    container.innerHTML = '';
-    DECK.forEach((cam, i)=>{
-      const btn = document.createElement('button');
-      btn.className = 'btn' + (i===currentBg ? ' active' : '');
-      btn.textContent = cam.name;
-      btn.addEventListener('click', ()=>{
-        btn.blur();
-        if (!audioArmed && !audioMuted) { ensureMainAudioOn(); audioArmed = true; }
-        switchBackground(i);
-        setActiveButton(i, container);
-        const other = (container===panel? sideList : panel);
-        if (other && other.children[i]){
-          [...other.children].forEach((b,idx)=> b.classList.toggle('active', idx===i));
-        }
-        logStatus('عرض: ' + DECK[i].name + (i===0?' (Main بالحجم الكامل — يمين في وضع التقسيم)':''));
-      });
-      container.appendChild(btn);
-    });
-  }
-
-  function applyLayout(){
-    videoArea.classList.toggle('split', isSplit);
-    sideList.style.display = isSplit ? 'flex' : 'none';
-    panel.style.display    = isSplit ? 'none'  : 'flex';
-    // تطبيق نسبة التقسيم عند التبديل
-    const pct = Math.min(70, Math.max(30, Number(cfg.splitPct||50)));
-    if (isSplit){
-      pip.style.width = pct + '%';
-      deck.style.right = pct + '%';
-      deck.style.left = '0%';
-    } else {
+    function buildMain(){
+      document.documentElement.style.setProperty('--brand', cfg.brand || '#ff3b30');
       const pipPct = Math.min(40, Math.max(15, Number(cfg.pipPct||28)));
       pip.style.width = `min(${pipPct}%, 420px)`;
-      deck.style.left = '0';
-      deck.style.right = '0';
+      const pct = Math.min(70, Math.max(30, Number(cfg.splitPct||50)));
+      if (isSplit){
+        pip.style.width = pct + '%'; deck.style.right = pct + '%'; deck.style.left = '0%';
+      } else { deck.style.left='0'; deck.style.right='0'; }
+      const url = withParams(cfg.main.src, { autoplay: 1, muted: 1, controls: 0, background: 1, playsinline: 1 });
+      mainIframe.src = url; updateAudioUI();
     }
-    applyPiPVisibility();
+    function buildDeckIframes(){
+      deck.innerHTML = '';
+      deckIframes = DECK.map((cam, i)=>{
+        const url = withParams(cam.src, { autoplay: 1, muted: 1, controls: 0, background: 1, playsinline: 1 });
+        const f = document.createElement('iframe');
+        f.src = url; f.setAttribute('allow','autoplay; fullscreen; picture-in-picture; encrypted-media; web-share'); f.setAttribute('allowfullscreen',''); f.setAttribute('loading','eager');
+        if (i===currentBg) f.classList.add('active');
+        deck.appendChild(f); return f;
+      });
+    }
+    function buildButtons(container){
+      container.innerHTML = '';
+      DECK.forEach((cam, i)=>{
+        const btn = document.createElement('button');
+        btn.className = 'btn' + (i===currentBg ? ' active' : '');
+        btn.textContent = cam.name;
+        btn.addEventListener('click', ()=>{
+          btn.blur();
+          if (!audioArmed && !audioMuted) { ensureMainAudioOn(); audioArmed = true; }
+          switchBackground(i);
+          setActiveButton(i, container);
+          const other = (container===panel? sideList : panel);
+          if (other && other.children[i]){
+            [...other.children].forEach((b,idx)=> b.classList.toggle('active', idx===i));
+          }
+          logStatus('عرض: ' + DECK[i].name + (i===0?' (Main بالحجم الكامل — يمين في وضع التقسيم)':''));
+        });
+        container.appendChild(btn);
+      });
+    }
+    function applyLayout(){
+      videoArea.classList.toggle('split', isSplit);
+      sideList.style.display = isSplit ? 'flex' : 'none';
+      panel.style.display    = isSplit ? 'none'  : 'flex';
+      const pct = Math.min(70, Math.max(30, Number(cfg.splitPct||50)));
+      if (isSplit){ pip.style.width = pct + '%'; deck.style.right = pct + '%'; deck.style.left = '0%'; }
+      else { const pipPct = Math.min(40, Math.max(15, Number(cfg.pipPct||28))); pip.style.width = `min(${pipPct}%, 420px)`; deck.style.left='0'; deck.style.right='0'; }
+      applyPiPVisibility();
+    }
+
+    audioBtn.addEventListener('click', ()=>{ if (audioMuted){ ensureMainAudioOn(); audioArmed = true; } else { ensureMainAudioOff(); } });
+    splitBtn.addEventListener('click', ()=>{ isSplit=!isSplit; splitBtn.setAttribute('aria-pressed', String(isSplit)); applyLayout(); });
+
+    (function init(){
+      buildMain(); buildDeckIframes(); buildButtons(panel); buildButtons(sideList); applyLayout();
+    })();
   }
-
-  // ======== Events ========
-  audioBtn.addEventListener('click', ()=>{ if (audioMuted){ ensureMainAudioOn(); audioArmed = true; } else { ensureMainAudioOff(); } });
-  splitBtn.addEventListener('click', ()=>{ isSplit=!isSplit; splitBtn.setAttribute('aria-pressed', String(isSplit)); applyLayout(); });
-
-  // ======== Tests (مختصرة) ========
-  function runTests(){
-    const errors = [];
-    const assert = (c,m)=>{ if(!c) errors.push(m); };
-
-    // T1: deck size == DECK length
-    assert(deckIframes.length === DECK.length, `T1: deck ${deckIframes.length} != DECK ${DECK.length}`);
-    // T2: one active iframe
-    let actives = deckIframes.filter(f=>f.classList.contains('active')).length;
-    assert(actives === 1, `T2: expected 1 active, got ${actives}`);
-    // T3: brand applied
-    assert(getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() !== '', 'T3: brand CSS var not set');
-
-    testsEl.textContent = errors.length ? ('Tests: FAILED — ' + errors.join(' | ')) : 'Tests: PASSED';
-    console[(errors.length?'error':'log')](testsEl.textContent);
-  }
-
-  // ======== Boot ========
-  (function init(){
-    buildMain();
-    buildDeckIframes();
-    buildButtons(panel);
-    buildButtons(sideList);
-    applyLayout();
-    logStatus('تشغيل');
-    setTimeout(runTests, 80);
-  })();
 })();
 </script>
 </body>

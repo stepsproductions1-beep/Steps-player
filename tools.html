@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>أدوات أمان — إنشاء مفاتيح RSA وTokens</title>
+  <style>
+    body{margin:0;padding:20px;background:#0b0f14;color:#e7eef7;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
+    .card{max-width:900px;margin:0 auto;background:#0f1620;border:1px solid #1f2937;border-radius:14px;padding:16px}
+    h2{margin-top:0}
+    label{display:block;margin:.5rem 0 .25rem;color:#b6c2d2}
+    input,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #2a3442;background:#121a24;color:#e7eef7}
+    .btn{display:inline-block;margin-top:10px;padding:10px 14px;border-radius:10px;border:1px solid #2a3442;background:#18202b;color:#e7eef7;cursor:pointer}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>توليد مفاتيح RSA (RS256)</h2>
+    <button id="genKeys" class="btn">إنشاء مفتاح جديد</button>
+    <div class="row">
+      <div>
+        <label>Public Key (JWK) — ارفعه كـ <code>publicKey.json</code></label>
+        <textarea id="pubJwk" rows="8" class="mono"></textarea>
+        <button id="dlPub" class="btn">تحميل publicKey.json</button>
+      </div>
+      <div>
+        <label>Private Key (PKCS8 PEM) — احفظه بسرية</label>
+        <textarea id="privPem" rows="8" class="mono"></textarea>
+        <button id="dlPriv" class="btn">تحميل privateKey.pem</button>
+      </div>
+    </div>
+
+    <h2>إصدار Token (JWT RS256)</h2>
+    <div class="row">
+      <div>
+        <label>Issuer (iss)</label>
+        <input id="iss" value="multicam-admin">
+      </div>
+      <div>
+        <label>Audience (aud)</label>
+        <input id="aud" value="multicam-viewer">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Expires in (minutes)</label>
+        <input id="expMin" type="number" value="120">
+      </div>
+      <div>
+        <label>Not before (minutes from now)</label>
+        <input id="nbfMin" type="number" value="0">
+      </div>
+    </div>
+    <label>المفتاح الخاص (PEM)</label>
+    <textarea id="signPem" rows="6" class="mono" placeholder="الصق privateKey.pem هنا للتوقيع"></textarea>
+    <button id="mint" class="btn">توليد JWT</button>
+    <label>JWT</label>
+    <textarea id="jwtOut" rows="3" class="mono"></textarea>
+  </div>
+
+<script>
+(async function(){
+  const te = new TextEncoder();
+  function b64url(bytes){ let bin=''; for(const b of new Uint8Array(bytes)) bin+=String.fromCharCode(b); return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+  function fromB64(b64){ const bin=atob(b64); const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i); return arr; }
+
+  async function genRSA(){
+    const kp = await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5', modulusLength:2048, publicExponent:new Uint8Array([1,0,1]), hash:'SHA-256'}, true, ['sign','verify']);
+    const jwk = await crypto.subtle.exportKey('jwk', kp.publicKey);
+    jwk.alg = 'RS256'; jwk.key_ops = ['verify']; jwk.ext = true;
+    const pkcs8 = await crypto.subtle.exportKey('pkcs8', kp.privateKey);
+    const pem = toPEM(pkcs8, 'PRIVATE KEY');
+    return {jwk, pem};
+  }
+  function toPEM(buf, label){
+    const b64 = b64url(buf).replace(/-/g,'+').replace(/_/g,'/');
+    const lines = b64.match(/.{1,64}/g).join('\\n');
+    return `-----BEGIN ${label}-----\\n${lines}\\n-----END ${label}-----`;
+  }
+  genKeys.onclick = async ()=>{
+    const {jwk,pem} = await genRSA();
+    pubJwk.value = JSON.stringify(jwk, null, 2);
+    privPem.value = pem;
+  };
+  function download(name, text){
+    const blob = new Blob([text], {type:'application/octet-stream'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href);
+  }
+  dlPub.onclick = ()=> download('publicKey.json', pubJwk.value||'{}');
+  dlPriv.onclick = ()=> download('privateKey.pem', privPem.value||'');
+
+  async function importPrivatePem(pem){
+    const base64 = pem.replace(/-----[^-]+-----/g,'').replace(/\\s+/g,'');
+    const bin = fromB64(base64);
+    return crypto.subtle.importKey('pkcs8', bin, {name:'RSASSA-PKCS1-v1_5', hash:'SHA-256'}, false, ['sign']);
+  }
+  mint.onclick = async ()=>{
+    try{
+      const iss = document.getElementById('iss').value.trim()||'multicam-admin';
+      const aud = document.getElementById('aud').value.trim()||'multicam-viewer';
+      const expMin = Math.max(1, Number(document.getElementById('expMin').value||120));
+      const nbfMin = Math.max(0, Number(document.getElementById('nbfMin').value||0));
+      const now = Math.floor(Date.now()/1000);
+      const header = {alg:'RS256',typ:'JWT'};
+      const payload = {iss,aud,iat:now,nbf:now+nbfMin*60,exp:now+expMin*60};
+      const h = b64url(te.encode(JSON.stringify(header)));
+      const p = b64url(te.encode(JSON.stringify(payload)));
+      const data = new TextEncoder().encode(h+'.'+p);
+      const pem = document.getElementById('signPem').value.trim();
+      if(!pem) throw new Error('الصق privateKey.pem للتوقيع');
+      const priv = await importPrivatePem(pem);
+      const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', priv, data);
+      const s = b64url(sig);
+      document.getElementById('jwtOut').value = h+'.'+p+'.'+s;
+    }catch(e){ alert(e.message||String(e)); }
+  };
+})();
+</script>
+</body>
+</html>

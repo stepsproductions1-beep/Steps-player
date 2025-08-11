@@ -1,0 +1,10 @@
+{
+  "kty": "RSA",
+  "e": "AQAB",
+  "n": "v0V0jXxP2nqCjYf2xX8S4o3Qm9uQ2HqBz2i2m1Q2vQ2Y1o5l2Q8YxPzqSxJ2t9Jbq3fCw0o8t9Nq6m8wV1f0fV2xZ2n2z0Y1b0R1e1M1T1m1L1x1i1W1V1U1v1K1I1",
+  "alg": "RS256",
+  "ext": true,
+  "key_ops": [
+    "verify"
+  ]
+}

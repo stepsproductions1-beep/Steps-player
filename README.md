@@ -1,15 +1,17 @@
 
-# Multi-Cam Vimeo Player — Ready to Deploy (Latest)
+# Multi‑Cam — High‑Security Static Bundle (GitHub Pages Ready)
 
-ملفّان أساسيان:
-- `index.html` — صفحة المشاهدة (Player). تقرأ الإعدادات من LocalStorage.
-- `admin.html` — لوحة التحكّم محميّة بكلمة مرور (Front-End).
+يوفّر:
+- بوابة وصول JWT (RS256) في `index.html`
+- إعدادات مشفّرة AES‑GCM (اختياري) أو `config.public.json`
+- لوحة تحكّم محمية PBKDF2 في `admin.html`
+- أدوات توليد مفاتيح وإصدار Tokens في `tools.html`
 
 ## النشر
-ارفع المجلد كما هو لأي استضافة static (Netlify, Vercel, GitHub Pages, S3, Nginx/Apache).
-يجب أن تكون `index.html` و `admin.html` على نفس الدومين ليشتركوا في LocalStorage.
+1) ارفع جميع الملفات لهذا المجلد إلى GitHub.
+2) Settings → Pages → Deploy from a branch (main /root).
+3) افتح `tools.html` لتوليد `publicKey.json` ورفعها.
+4) من `admin.html` عدّل الإعدادات ثم إمّا تصدير `config.public.json` ورفعه، أو حفظ إعدادات مشفّرة في LocalStorage.
+5) وزّع الرابط للمشاهدين بصيغة: `https://USERNAME.github.io/REPO/?t=JWT`
 
-## الاستخدام
-1) افتح `admin.html` أول مرة لتعيين كلمة مرور.
-2) عدّل الإعدادات واحفظ.
-3) افتح/حدّث `index.html` لمشاهدة التغييرات.
+ملاحظة: لأمان مؤسسي، استخدم Cloudflare Access على الدومين.
