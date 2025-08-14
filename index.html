@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>playerSteps</title>
+
+  <!-- سرعة التحميل -->
+  <link rel="preconnect" href="https://player.vimeo.com">
+  <link rel="preconnect" href="https://i.vimeocdn.com">
+  <link rel="preconnect" href="https://www.youtube.com">
+  <link rel="preconnect" href="https://i.ytimg.com">
+  <link rel="dns-prefetch" href="https://player.vimeo.com">
+  <link rel="dns-prefetch" href="https://www.youtube.com">
+
+  <style>
+    :root{--bg:#0b0f14;--muted:#2a3442;--brand:#ff3b30;--text:#e7eef7;--text-dim:#a8b3c2}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
+    .wrap{width:100vw;height:100svh;margin:0}
+    .player-card{width:100%;height:100%;background:transparent;overflow:hidden}
+    .video-area{position:relative;width:100%;height:100%;background:#000;overflow:hidden}
+    .iframeDeck{position:absolute;inset:0;overflow:hidden}
+    /* الآن: عناصر الـDeck المباشرة هي الحاويات .yt-live-wrap */
+    .iframeDeck > *{position:absolute;inset:0;width:100%;height:100%;opacity:0;visibility:hidden;transition:opacity .18s ease}
+    .iframeDeck > *.active{opacity:1;visibility:visible;z-index:1}
+    .iframeDeck > *.fading{opacity:0;visibility:visible;z-index:0;pointer-events:none}
+
+    /* الحاوية التي تطبق عليها الانحناء وتقصّ ما بداخلها */
+    .yt-live-wrap{
+      position:absolute; inset:0; width:100%; height:100%;
+      border-radius:inherit;        /* ترث الانحناء من الأب (pip مثلاً) */
+      overflow:hidden;              /* مهم لإخفاء الزوايا السوداء */
+      background:#000;              /* يمنع وميض الخلفية */
+    }
+    .yt-live-wrap > iframe,
+    .yt-live-wrap > video{
+      position:absolute; inset:0; width:100%; height:100%; border:0; display:block;
+    }
+    .yt-live-wrap > video{ object-fit:cover; } /* لو المصدر HTML5 */
+
+    .pip{
+     position:absolute;right:16px;top:16px;
+     width:min(22%,360px);aspect-ratio:16/9;overflow:visible;z-index:2;
+     border-radius:14px; /* الانحناء يُورَّث إلى .yt-live-wrap */
+     outline:1px solid rgba(255,255,255,.14);
+     box-shadow:0 0 0 1px rgba(0,0,0,.25) inset, 0 8px 20px rgba(0,0,0,.35);
+     background:transparent;
+     }
+    /* الآن الطفل المباشر هو .yt-live-wrap وليس iframe */
+    .pip > *{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+    .pip.hidden{display:none}
+
+    .video-area.split .pip{right:0;top:0;width:50%;height:100%;aspect-ratio:auto;z-index:1}
+    .video-area.split #iframeDeck{left:0;right:50%}
+
+    .controls{position:absolute;left:16px;right:16px;bottom:16px;display:flex;gap:8px;flex-wrap:wrap;z-index:3}
+    .btn{border:1px solid var(--muted);background:#18202b;color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600;transition:.2s}
+    .btn.active{background:var(--brand);border-color:transparent;color:#fff}
+    .sideList{position:absolute;top:50%;left:16px;transform:translateY(-50%);display:none;flex-direction:column;gap:8px;z-index:4}
+    .sideList .btn{padding:8px 10px;font-size:13px;border-radius:8px}
+    .video-area.split .sideList{display:flex}
+    .video-area.split .controls{display:none}
+
+    .topLeft{position:absolute;left:16px;top:16px;z-index:4;display:flex;gap:8px;flex-wrap:wrap}
+    .audioBtn,.splitBtn{border:1px solid var(--muted);background:#1b2531;color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:700}
+    .audioBtn[aria-pressed="true"],.splitBtn[aria-pressed="true"]{background:var(--brand);color:#fff;border-color:transparent}
+
+    .meta{position:absolute;left:16px;top:60px;z-index:3;color:var(--text-dim);font-size:14px;background:rgba(0,0,0,.35);padding:6px 10px;border-radius:8px}
+    .badge{padding:2px 6px;border:1px solid var(--muted);border-radius:999px;margin-right:8px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="player-card">
+    <div class="video-area" id="videoArea">
+      <div id="iframeDeck" class="iframeDeck" aria-live="polite"></div>
+
+      <!-- PiP = Main -->
+      <div class="pip" id="pip" title="Main (الصوت الرئيسي)">
+        <!-- الحاوية ذات الانحناء والقص -->
+        <div class="yt-live-wrap" id="mainWrap">
+          <iframe id="mainIframe" src="about:blank" allow="autoplay; fullscreen; picture-in-picture; encrypted-media; web-share" allowfullscreen></iframe>
+        </div>
+      </div>
+
+      <div class="topLeft">
+        <button id="audioBtn" class="audioBtn" type="button" aria-pressed="false" aria-label="تشغيل/إيقاف صوت Main">🔇 الصوت: متوقف</button>
+        <button id="splitBtn" class="splitBtn" type="button" aria-pressed="false" aria-label="تبديل وضع تقسيم الشاشة">🞄🞄 تقسيم الشاشة</button>
+      </div>
+
+      <div class="controls" id="camButtons"></div>
+      <div class="sideList" id="sideList"></div>
+
+      <div class="meta"><span class="badge" id="status"></span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Vimeo API -->
+<script src="https://player.vimeo.com/api/player.js"></script>
+<!-- YouTube IFrame API -->
+<script>
+  (function(){var s=document.createElement('script');s.src="https://www.youtube.com/iframe_api";document.head.appendChild(s);})();
+  let ytReadyResolve; const ytReady=new Promise(res=>ytReadyResolve=res);
+  window.onYouTubeIframeAPIReady=function(){ ytReadyResolve(); };
+</script>
+
+<script>
+(function(){
+  // ========= CONFIG =========
+  const MAIN = { name:'Main', src:'https://vimeo.com/event/5308042/embed/interaction' };
+  const CAMS = [
+    { name:'Cam 1', src:'https://player.vimeo.com/video/1109373159?badge=0&autopause=0&player_id=0&app_id=58479' },
+    { name:'Cam 2', src:'https://www.youtube.com/live/tdj8xGyfGvI?si=yCNWC53Sdw9Ik-5f' },
+    { name:'Cam 3', src:'https://vimeo.com/event/5304570/embed/interaction' },
+    { name:'Cam 4 (YouTube Live)', src:'https://www.youtube.com/watch?v=jfKfPfyJRdk' },
+    { name:'Cam 5', src:'https://youtu.be/WZby5BGTjEQ?si=Q4-vFkLxWzyHajvO' },
+    { name:'Cam 6 (YT Channel Live)', src:'https://www.youtube.com/embed/live_stream?channel=UCSJ4gkVC6NrvII8umztf0Ow' }
+  ];
+  const DECK = [MAIN, ...CAMS];
+
+  // ========= Elements =========
+  const videoArea = document.getElementById('videoArea');
+  let   mainIframeEl = document.getElementById('mainIframe');
+  const pip = document.getElementById('pip');
+  const deck = document.getElementById('iframeDeck');
+  const panel = document.getElementById('camButtons');
+  const sideList = document.getElementById('sideList');
+  const status = document.getElementById('status');
+  const audioBtn = document.getElementById('audioBtn');
+  const splitBtn = document.getElementById('splitBtn');
+
+  // ========= State =========
+  let currentBg = 0;
+  let deckNodes = [];          // الآن: حاويات .yt-live-wrap
+  let mainPlayer = null;
+  let mainPlatform = 'vimeo';  // 'youtube' | 'vimeo' | 'html5' | 'iframe'
+  let audioArmed = false;
+  let audioMuted = true;
+  let isSplit = false;
+
+  // ========= Utils =========
+  const qJoin = (obj)=> Object.entries(obj).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+  const withParams = (base, params)=> base + (base.includes('?')?'&':'?') + qJoin(params);
+  const logStatus = (t)=> status.textContent = t || '';
+  const setActiveButton = (i,c)=>{ [...c.children].forEach((b,idx)=> b.classList.toggle('active', idx===i)); };
+  const applyPiPVisibility = ()=>{
+    const hideWhenMain = !isSplit && currentBg === 0;
+    pip.classList.toggle('hidden', hideWhenMain);
+  };
+  const updateAudioUI = ()=>{
+    audioBtn.setAttribute('aria-pressed', String(!audioMuted));
+    audioBtn.textContent = audioMuted ? '🔇 الصوت: متوقف' : '🔊 الصوت: يعمل';
+    audioBtn.dataset.muted = String(audioMuted);
+  };
+
+  // --- Detect + build embed ---
+  function parseSource(u){
+    u=(u||'').trim(); let m;
+    if(/youtu/i.test(u)){
+      if((m=u.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/))) return {type:'youtube', id:m[1]};
+      if((m=u.match(/[?&]v=([A-Za-z0-9_-]{6,})/))) return {type:'youtube', id:m[1]};
+      if((m=u.match(/youtube\.com\/live\/([A-Za-z0-9_-]{6,})/))) return {type:'youtube', id:m[1]};
+      if((m=u.match(/embed\/live_stream\?channel=([A-Za-z0-9_-]+)/))) return {type:'youtube-channel', channel:m[1]};
+      if((m=u.match(/embed\/([A-Za-z0-9_-]{6,})/))) return {type:'youtube', id:m[1]};
+      return {type:'iframe', src:u};
+    }
+    if(/vimeo/i.test(u)){
+      if((m=u.match(/vimeo\.com\/event\/(\d+)/))) return {type:'vimeo-event', id:m[1], raw:u};
+      if((m=u.match(/(?:player\.)?vimeo\.com\/video\/(\d+)/))) return {type:'vimeo-video', id:m[1], raw:u};
+      return {type:'vimeo-raw', raw:u};
+    }
+    if(/\.(mp4|webm|m3u8)(\?|#|$)/i.test(u)) return {type:'html5', src:u};
+    return {type:'iframe', src:u};
+  }
+  const ytURL = (id)=> `https://www.youtube.com/embed/${id}?${qJoin({autoplay:1,mute:1,playsinline:1,rel:0,modestbranding:1,enablejsapi:1})}`;
+  const ytChannelURL = (cid)=> `https://www.youtube.com/embed/live_stream?${qJoin({channel:cid,autoplay:1,mute:1,playsinline:1,rel:0,modestbranding:1,enablejsapi:1})}`;
+  function vimeoURL(type,id,raw){
+    let base=(type==='vimeo-event')?`https://vimeo.com/event/${id}/embed`:`https://player.vimeo.com/video/${id}`;
+    if(/interaction/.test(raw||'')) base += '/interaction';
+    return withParams(base,{autoplay:1,muted:1,background:1,playsinline:1,dnt:1});
+  }
+  function makeEmbedEl(u){
+    const info = parseSource(u);
+    if(info.type==='youtube' && info.id){
+      const f=document.createElement('iframe'); f.src=ytURL(info.id);
+      f.allow='autoplay; fullscreen; picture-in-picture; encrypted-media; web-share'; f.allowFullscreen=true; f.loading='eager';
+      return {el:f, platform:'youtube'};
+    }
+    if(info.type==='youtube-channel' && info.channel){
+      const f=document.createElement('iframe'); f.src=ytChannelURL(info.channel);
+      f.allow='autoplay; fullscreen; picture-in-picture; encrypted-media; web-share'; f.allowFullscreen=true; f.loading='eager';
+      return {el:f, platform:'youtube'};
+    }
+    if(info.type==='vimeo-event' || info.type==='vimeo-video'){
+      const f=document.createElement('iframe'); f.src=vimeoURL(info.type, info.id, info.raw);
+      f.allow='autoplay; fullscreen; picture-in-picture; encrypted-media; web-share'; f.allowFullscreen=true; f.loading='eager';
+      return {el:f, platform:'vimeo'};
+    }
+    if(info.type==='html5'){
+      const v=document.createElement('video'); v.src=info.src; v.autoplay=true; v.muted=true; v.playsInline=true; v.controls=true;
+      return {el:v, platform:'html5'};
+    }
+    const f=document.createElement('iframe'); f.src=withParams(info.src,{autoplay:1,muted:1,playsinline:1});
+    f.allow='autoplay; fullscreen; picture-in-picture; encrypted-media; web-share'; f.allowFullscreen=true; f.loading='eager';
+    return {el:f, platform:'iframe'};
+  }
+
+  // ========= Audio (Main فقط) =========
+  let ytApiReady=false; ytReady.then(()=>ytApiReady=true);
+
+  async function ensureMainPlayer(){
+    if(mainPlatform==='youtube'){
+      if(!ytApiReady) await ytReady;
+      if(!mainPlayer || !('unMute' in mainPlayer)){
+        mainPlayer = new YT.Player(mainIframeEl, {events:{onReady:()=>{}}});
+      }
+    }else if(mainPlatform==='vimeo'){
+      if(!mainPlayer || !('setMuted' in mainPlayer)) mainPlayer = new Vimeo.Player(mainIframeEl);
+    }else if(mainPlatform==='html5'){
+      mainPlayer = null; // نستخدم عنصر الفيديو نفسه
+    }else{
+      mainPlayer = null;
+    }
+  }
+
+  async function ensureMainAudioOn(){
+    await ensureMainPlayer();
+    try{
+      if(mainPlatform==='youtube'){
+        mainPlayer.unMute();
+        if (mainPlayer.playVideo) mainPlayer.playVideo();
+      } else if(mainPlatform==='vimeo'){
+        await mainPlayer.setMuted(false);
+        await mainPlayer.play();
+      } else if(mainPlatform==='html5'){
+        mainIframeEl.muted = false;
+        if (mainIframeEl.play) mainIframeEl.play();
+      }
+      audioMuted = false;
+      updateAudioUI();
+    }catch(e){}
+  }
+
+  async function ensureMainAudioOff(){
+    await ensureMainPlayer();
+    try{
+      if(mainPlatform==='youtube'){
+        mainPlayer.mute();
+      } else if(mainPlatform==='vimeo'){
+        await mainPlayer.setMuted(true);
+      } else if(mainPlatform==='html5'){
+        mainIframeEl.muted = true;
+      }
+      audioMuted = true;
+      updateAudioUI();
+    }catch(e){}
+  }
+
+  // ========= UI =========
+  function switchBackground(i){
+    if(i===currentBg) return;
+    const cur=deckNodes[currentBg], nxt=deckNodes[i]; if(!nxt) return;
+    if(cur){ cur.classList.remove('active'); cur.classList.add('fading'); setTimeout(()=>cur.classList.remove('fading'), 350); }
+    nxt.classList.add('active'); currentBg=i; applyPiPVisibility();
+  }
+
+  function buildMain(){
+    const made=makeEmbedEl(MAIN.src); mainPlatform=made.platform;
+
+    // تأكد أن لدينا الحاوية
+    let wrap = document.getElementById('mainWrap');
+    if(!wrap){
+      wrap=document.createElement('div');
+      wrap.className='yt-live-wrap';
+      wrap.id='mainWrap';
+      pip.innerHTML='';
+      pip.appendChild(wrap);
+    }
+
+    if(made.el.tagName==='IFRAME'){
+      // أعد استخدام نفس الـid للـAPI
+      mainIframeEl.src=made.el.src;
+      mainIframeEl.setAttribute('allow',made.el.getAttribute('allow'));
+      mainIframeEl.setAttribute('allowfullscreen','');
+      if(!wrap.contains(mainIframeEl)){
+        wrap.innerHTML='';
+        wrap.appendChild(mainIframeEl);
+      }
+    } else {
+      // عنصر <video>
+      mainIframeEl.replaceWith(made.el);
+      made.el.id='mainIframe';
+      mainIframeEl = made.el;
+      wrap.innerHTML='';
+      wrap.appendChild(mainIframeEl);
+    }
+    updateAudioUI();
+  }
+
+  function buildDeck(){
+    deckNodes = DECK.map((cam,i)=>{
+      const m=makeEmbedEl(cam.src);
+      const wrap=document.createElement('div');
+      wrap.className='yt-live-wrap';
+      if(i===0) wrap.classList.add('active');
+      wrap.appendChild(m.el);
+      deck.appendChild(wrap);
+      return wrap; // الآن العقدة هي الحاوية
+    });
+  }
+
+  function buildButtons(container){
+    container.innerHTML='';
+    DECK.forEach((cam,i)=>{
+      const b=document.createElement('button');
+      b.className='btn'+(i===0?' active':'');
+      b.textContent=cam.name;
+      b.onclick=async()=>{
+        b.blur();
+        if(!audioArmed && !audioMuted){
+          await ensureMainAudioOn();
+          audioArmed = true;
+        }
+        switchBackground(i);
+        setActiveButton(i,container);
+        const other=(container===panel?sideList:panel);
+        if(other && other.children[i]){
+          [...other.children].forEach((x,idx)=>x.classList.toggle('active', idx===i));
+        }
+        logStatus('عرض: '+DECK[i].name);
+      };
+      container.appendChild(b);
+    });
+  }
+
+  function applyLayout(){
+    videoArea.classList.toggle('split', isSplit);
+    sideList.style.display=isSplit?'flex':'none';
+    panel.style.display=isSplit?'none':'flex';
+    applyPiPVisibility();
+  }
+
+  // ========= Boot =========
+  (function init(){
+    buildMain();
+    buildDeck();
+    buildButtons(panel);
+    buildButtons(sideList);
+
+    // زر الصوت — تبديل حقيقي ON/OFF مع انتظار الـ APIs
+    audioBtn.addEventListener('click', async () => {
+      await ensureMainPlayer();
+      try{
+        if (audioMuted){
+          await ensureMainAudioOn();   // تشغيل
+          audioArmed = true;
+        } else {
+          await ensureMainAudioOff();  // كتم
+        }
+      }catch(e){
+        console.warn('Audio toggle failed', e);
+      }
+    });
+
+    // تقسيم الشاشة
+    splitBtn.addEventListener('click', ()=>{
+      isSplit = !isSplit;
+      splitBtn.setAttribute('aria-pressed', String(isSplit));
+      applyLayout();
+    });
+  })();
+})();
+</script>
+</body>
+</html>
